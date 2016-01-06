@@ -376,7 +376,7 @@ public:
     translation_unit(const char * filename, const char ** args, int argv) : filename(filename)
     {
         // this->index = clang_createIndex(1, 1);
-        this->tu = clang_parseTranslationUnit(get_index(), filename, args, argv, NULL, 0, parse_options());
+        this->tu = clang_createTranslationUnitFromSourceFile(get_index(), filename, argv, args, 0, nullptr );
         detach_async([=]() { this->reparse(); });
     }
 
@@ -662,7 +662,7 @@ public:
             // If we are busy with a query, lets avoid making lots of new queries
             if (not this->q.ready()) return {};
             
-            auto self = this->shared_from_this();
+            std::weak_ptr<async_translation_unit> self = this->shared_from_this();
             std::string buffer_as_string(buffer, buffer+len);
             this->q.set(detach_async([=]
             {
@@ -670,7 +670,14 @@ public:
                 if (buffer == nullptr) b = nullptr;
                 // TODO: Should we always reparse?
                 // else this->reparse(b, len);
-                return self->complete_at(line, col, "", b, buffer_as_string.length());
+                if (auto s = self.lock())
+                {
+                    return s->complete_at(line, col, "", b, buffer_as_string.length());
+                }
+                else
+                {
+                    return std::vector<completion>();
+                }
             }), line, col);
         }
         auto completions = q.get(timeout);

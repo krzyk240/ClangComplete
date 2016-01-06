@@ -20,7 +20,11 @@ def get_setting(view, key, default=None):
     return get_settings().get(key, default)
 
 def get_project_path(view):
-    return view.window().folders()[0]
+    try:
+        return view.window().folders()[0]
+    except:
+        pass
+    return ""
 
 
 def get_unsaved_buffer(view):
@@ -40,8 +44,8 @@ def debug_print(*args):
 def parse_flags(f):
     flags = []
     for line in open(f).readlines():
-        if line.startswith('CXX_FLAGS') or line.startswith('CXX_DEFINES'):
-            words = line[line.index('=')+1:].split()
+        if line.startswith('CXX_FLAGS') or line.startswith('CXX_DEFINES') or line.startswith('CXX_INCLUDES'):
+            words = re.findall('(-[^\s\"]+\"[^\"]+\"|[^\s]+)',line[line.index('=')+1:])
             flags.extend([word for word in words if not word.startswith('-g')])
     return flags
 
@@ -88,7 +92,15 @@ def filter_flag(f):
 def split_flags(flags):
     result = []
     for f in flags:
-        if filter_flag(f): result.extend(f.split())
+        fm = re.match('(^-[^\s\"]+)(\"[^\"]+\"$)', f)
+        if fm:
+            option = fm.group(1)
+            path = fm.group(2)
+            path = path.replace('"','')
+
+            result.append(option)
+            result.append(path)
+        elif filter_flag(f): result.extend(f.split())
     return result
 
 def accumulate_options(path):
@@ -191,18 +203,20 @@ def find_includes(view, project_path):
 
 def get_includes(view):
     global project_includes
+    result = []
     if includes_lock.acquire(blocking=False):
         try:
             project_path = get_project_path(view)
             if project_path not in project_includes:
                 project_includes[project_path] = find_includes(view, project_path)
             result = project_includes[project_path]
+        except:
+            pass
         finally:
             includes_lock.release()
-        return result
     else:
         debug_print("Includes locked: return nothing")
-        return []
+    return result
 
 def parse_slash(path, index):
     last = path.find('/', index)
@@ -292,12 +306,14 @@ clang_error_panel = ClangErrorPanel()
 language_regex = re.compile("(?<=source\.)[\w+#]+")
 
 def get_language(view):
-    caret = view.sel()[0].a
-    language = language_regex.search(view.scope_name(caret))
-    if language == None:
+    try:
+        caret = view.sel()[0].a
+        language = language_regex.search(view.scope_name(caret))
+        if language == None:
+            return None
+        return language.group(0)
+    except:
         return None
-    return language.group(0)
-
 
 def is_supported_language(view):
     language = get_language(view)
@@ -478,7 +494,7 @@ class ClangCompleteAutoComplete(sublime_plugin.EventListener):
             if 'toggle' in args and args['toggle'] == True and build_panel_window_id != None: build_panel_window_id=None
             else: build_panel_window_id = window.id()
         if command_name == 'hide_panel':
-            if build_panel_window_id != None or ('panel' in args and args['panel'] == 'output.exec'):
+            if build_panel_window_id != None or args != None and ('panel' in args and args['panel'] == 'output.exec'):
                 build_panel_window_id = None
         return None
 
