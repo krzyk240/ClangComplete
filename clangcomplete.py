@@ -120,11 +120,16 @@ def clear_options():
     global project_options
     project_options = {}
 
-def get_options(project_path, additional_options, build_dir, default_options):
+def get_build_dir(view):
+    result = get_setting(view, "build_dir", ["build"])
+    if isinstance(result, str): return [result]
+    else: return result
+
+def get_options(project_path, additional_options, build_dirs, default_options):
     if project_path in project_options: return project_options[project_path]
 
-    build_dir = os.path.join(project_path, build_dir)
-    if os.path.exists(build_dir):
+    build_dir = next((build_dir for d in build_dirs for build_dir in [os.path.join(project_path, d)] if os.path.exists(build_dir)), None)
+    if build_dir != None:
         project_options[project_path] = ['-x', 'c++'] + accumulate_options(build_dir) + additional_options
     else:
         project_options[project_path] = ['-x', 'c++'] + default_options + additional_options
@@ -135,9 +140,9 @@ def get_options(project_path, additional_options, build_dir, default_options):
 def get_args(view):
     project_path = get_project_path(view)
     additional_options = get_setting(view, "additional_options", [])
-    build_dir = get_setting(view, "build_dir", "build")
+    build_dir = get_build_dir(view)
     default_options = get_setting(view, "default_options", ["-std=c++11"])
-    # debug_print(get_options(project_path, additional_options, build_dir, default_options))
+    debug_print(get_options(project_path, additional_options, build_dir, default_options))
     return get_options(project_path, additional_options, build_dir, default_options)
 
 #
@@ -531,8 +536,14 @@ class ClangCompleteAutoComplete(sublime_plugin.EventListener):
 
     def on_post_save_async(self, view):
         if not is_supported_language(view): return
+
+        show_panel = None
+        show_diagnostics_on_save = get_setting(view, "show_diagnostics_on_save", "no_build")
+        if show_diagnostics_on_save == 'always': show_panel = True
+        elif show_diagnostics_on_save == 'never': show_panel = False
+        else: show_panel = not is_build_panel_visible(view.window())
         
-        if not is_build_panel_visible(view.window()): self.show_diagnostics(view)
+        if show_panel: self.show_diagnostics(view)
         
         pos = view.sel()[0].begin()
         self.complete_at(view, "", pos, 0)

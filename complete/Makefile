@@ -1,4 +1,5 @@
 CXX=g++
+CXXFLAGS= -std=c++11
 PYTHON_FLAGS=$(shell pkg-config --cflags python-3.3)
 PYTHON_LIBS=$(shell pkg-config --libs python-3.3)
 
@@ -22,11 +23,11 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 all:
-	$(CXX) -std=gnu++0x $(FLAGS) -DNDEBUG -Os -c -fPIC complete.cpp -o $(SRC).o
+	$(CXX) $(CXXFLAGS) $(FLAGS) -DNDEBUG -Os -c -fPIC complete.cpp -o $(SRC).o
 	$(CXX) $(LDFLAGS)
 debug:
-	$(CXX) -std=gnu++0x $(FLAGS) -g -c -fPIC -DCLANG_COMPLETE_LOG $(SRC).cpp -o $(SRC).o
+	$(CXX) $(CXXFLAGS) $(FLAGS) -g -c -fPIC -DCLANG_COMPLETE_LOG $(SRC).cpp -o $(SRC).o
 	$(CXX) $(LDFLAGS)
 log:
-	$(CXX) -std=gnu++0x $(FLAGS) -Os -c -fPIC -DCLANG_COMPLETE_LOG $(SRC).cpp -o $(SRC).o
+	$(CXX) $(CXXFLAGS) $(FLAGS) -Os -c -fPIC -DCLANG_COMPLETE_LOG $(SRC).cpp -o $(SRC).o
 	$(CXX) $(LDFLAGS)
